@@ -17,21 +17,29 @@ current_song = 0
 def main_playing(pos,action):
     global pid
     global contents
-    if action == 'skip' and pid != 0:
+    global current_song
+    if action == 'skip':
         if current_song+1 == len(contents):
             play_a_song(contents[0])
+            current_song = 0
+            out.value(brow.text(1))
         else:
             play_a_song(contents[current_song+1])
-            
-    elif action == 'back' and pid != 0:
-        if current_song-1 == 0:
+            current_song += 1
+            out.value(brow.text(current_song+1))
+    elif action == 'back':
+        if current_song == 0:
             play_a_song(contents[-1])
+            current_song = len(contents)-1
+            out.value(brow.text(len(contents)))
         else:
             play_a_song(contents[current_song-1])
-
+            current_song -= 1
+            out.value(brow.text(current_song+1))
     elif action == 'play':
         play_a_song(contents[int(pos)])
         current_song = pos
+        out.value(brow.text(current_song+1))
         
 def play_a_song(mp3_file):
     global pid
@@ -42,12 +50,6 @@ def play_a_song(mp3_file):
     
     print('poll value: ' +str(sp.Popen.poll(pid)))
     
-    # while True:
-    #     print('poll value: ' +str(sp.Popen.poll()))
-    #     if sp.Popen.poll() != None:
-    #         break
-        #current = MP
-
 def remove_cb(wid):
     global location
     os.remove(location)
@@ -58,7 +60,6 @@ def brow_cb(wid):
     index=brow.value() # position of the line selected
     print("pos:"+str(index))
     name=brow.text(index) # starts at 1
-    out.value(name)
     
     location = contents[int(index)-1]
     print(location)            
@@ -68,32 +69,25 @@ def play_cb(wid):
     print(pid)
     if pid ==0:
         main_playing(index-1,'play')
-        ''' # if is playing already
-        for x in range(len(contents)):
-            print("here is the location: "+str(location))
-            pid = sp.Popen([vlc_player,'--intf', 'dummy', 'file:///'+ contents[int(pos)-1]])
-            if int(pos)-1 == len(contents):
-                pos = 1
-            else:
-                pos += 1
-            current = MP3(str(contents[int(pos)-1]))
-            sleep((current.info.length))
-            pid.send_signal(signal.SIGTERM)
-            pid = 0
-            '''
+ 
         #pid = sp.Popen(['C:/Program Files (x86)/VideoLAN/VLC/vlc.exe','--intf', 'dummy', 'file:///C:/tools/my_code/musics/TeflonSega_RAIN.mp3'])
         #"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe" --intf  dummy C:\tools\my_code\musics\TeflonSega_RAIN.mp3
         #print("pid:"+str(pid))
 
+def go_to(wid,action):
+	if action == 'playing':
+		if pid == 0:
+			fl_message('nothing is playing')
+		else:
+			brow.select(current_song+1)
+	elif action == 'last':
+		brow.select(len(contents))
+	elif action == 'first':
+		brow.select(1)
+
 def skip_cb(wid,act):
     global pid
     main_playing(index-1,act)
-def open_mp3_folder(wid):
-    # get a list of mp3 files
-    mp3_files= []
-    for each in mp3_files:
-        play_a_song(each)
-        
 
 
 def signal_cb(wid,sig):
@@ -101,9 +95,13 @@ def signal_cb(wid,sig):
     if pid != 0:
         pid.send_signal(sig)
         pid = 0
+    if wid == win:
+        win.hide()
 
 def navigate_folder(wid):
     global contents
+    contents = []
+    brow.clear()
     folder = fl_dir_chooser('List out MP3 files', 'C:', 0)
     print("nav: folder: "+str(folder))
     for x in os.listdir(folder):
@@ -148,8 +146,9 @@ brow=Fl_Hold_Browser(0,55,win.w(),225)
 menu = Fl_Menu_Bar(0,0,win.w(),25)
 #fl_chooser = Fl_File_Chooser("C:", "MP3", Fl_File_Chooser.SINGLE, "My File Selector")
 menu.add("Open Folder a |",0,navigate_folder)
-
-
+menu.add("Skip to.../Playing",0,go_to,'playing')
+menu.add("Skip to.../First",0,go_to,'first')
+menu.add("Skip to.../Last",0,go_to,'last')
 
 out=Fl_Output(0,25,win.w(),30) # working
 prev_song = Fl_Button(0,280,65,65) # not working
@@ -168,6 +167,7 @@ remove = Fl_Button(260,280,65,65) # works
 remove.label("@menu")
 win.end()
 
+win.callback(signal_cb,signal.SIGTERM)
 play.callback(play_cb)
 stop.callback(signal_cb,signal.SIGTERM)
 brow.callback(brow_cb)
