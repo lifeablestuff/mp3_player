@@ -10,7 +10,7 @@ contents = [] # list of songs in directory selected with full path
 global pid
 pid = 0
 global index
-index = -1
+index = 0
 global current_song
 current_song = 0
 
@@ -19,6 +19,7 @@ def main_playing(pos,action):
     global pid
     global contents
     global current_song
+    pos -= 1
     if pos+1 == 0: # pos+1 because index is subtracted by 1 when passed into func
         fl_message('please select a song first')
         return None
@@ -28,8 +29,8 @@ def main_playing(pos,action):
             current_song = 0
             out.value(brow.text(1)) # brow index is 1 based
         else:
-            play_a_song(contents[current_song+1])
             current_song += 1
+            play_a_song(contents[current_song])
             out.value(brow.text(current_song+1)) # current_song+1 because browser index is 1 based
         
     elif action == 'back':
@@ -38,9 +39,10 @@ def main_playing(pos,action):
             current_song = len(contents)-1
             out.value(brow.text(len(contents)))
         else:
-            play_a_song(contents[current_song-1])
             current_song -= 1
+            play_a_song(contents[current_song])
             out.value(brow.text(current_song+1))
+            
     elif action == 'play':
         play_a_song(contents[int(pos)])
         current_song = pos
@@ -48,19 +50,22 @@ def main_playing(pos,action):
 
 
 def play_a_song(mp3_file):
-	# playing of the song
+	# playing of the son
     global pid
-    print("here is the location: "+str(mp3_file))
     if pid != 0:
        pid.send_signal(signal.SIGTERM)
     pid = sp.Popen([vlc_player,'--intf', 'dummy', 'file:///' + str(mp3_file)])
     
-    print('poll value: ' +str(sp.Popen.poll(pid)))
     
 def remove_cb(wid):
 	# removes selected song
-    global location
-    os.remove(location)
+    global current_song
+    os.remove(contents[index-1])
+    brow.remove(index)
+    contents.pop(index-1)
+    if pid !=0:
+        pid.send_signal(signal.SIGTERM)
+        out.value('')
     fl_message('file has been removed')
 
 def brow_cb(wid):
@@ -70,26 +75,24 @@ def brow_cb(wid):
         return None
     global index
     index=brow.value() # position of the line selected
-    print("pos:"+str(index))
     name=brow.text(index) # brow index starts at 1
-    location = contents[int(index)-1]
-    print(location)            
+    location = contents[int(index)-1]   
+           
 def play_cb(wid):
     # playing of selected song
-    
-    #    global location #path
-    print(pid)
-    main_playing(index-1,'play')
+    if contents == []:
+	    fl_message('please select a directory of songs first')
+	    return None 
+    main_playing(index,'play')
 
-        #pid = sp.Popen(['C:/Program Files (x86)/VideoLAN/VLC/vlc.exe','--intf', 'dummy', 'file:///C:/tools/my_code/musics/TeflonSega_RAIN.mp3'])
-        #"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe" --intf  dummy C:\tools\my_code\musics\TeflonSega_RAIN.mp3
-        #print("pid:"+str(pid))
 
 def clear_all(wid):
 	# cleans up all items inside browser
-	brow.clear()
-	pid.send_signal(signal.SIGTERM)
-	out.value('')
+    brow.clear()
+    if pid != 0:	
+	    pid.send_signal(signal.SIGTERM)
+    out.value('')
+	
 	
 def go_to(wid,action):
 	if action == 'playing':
@@ -104,7 +107,9 @@ def go_to(wid,action):
 
 def skip_cb(wid,act):# act for main_playing to understand to go back or forward 1 song
     global pid
-    main_playing(index-1,act)
+    if contents == []:
+        fl_message('please select a directory of songs first')
+    main_playing(index,act)
 
 
 def signal_cb(wid,sig):
@@ -121,7 +126,6 @@ def navigate_folder(wid):
     brow.clear()
     # creates gui for user to select directory with mp3 files
     folder = fl_dir_chooser('Choose directory with MP3 files', 'C:', 0)
-    print("nav: folder: "+str(folder))
     for x in os.listdir(folder):
         print(x)
         # sanitization to prevent non mp3 files to be displayed
@@ -132,34 +136,6 @@ def navigate_folder(wid):
             brow.add(x)
     print(contents)
     
-    
-
-def find_dir_cb(wid):
-	# finding directory of songs
-# https://www.fltk.org/doc-1.3/classFl__File__Chooser.html#details
-    global location
-    fname= fl_file_chooser('Open File','*.mp3',None)
-    location = pathlib.Path(fname)
-    print("find_dir_cb: "+str(location))
-    print("find_dir_cb value:"+str(fname ))
-    
-   
-    '''
-    dir = str(dir)
-    temp = str('\ ')
-    for x in range(len(dir)-1,-1,-1):
-        if dir[x] in "\\":
-            dir = dir[:x]
-            '''
-'''
-def inp_cb(wid):
-    name=wid.value() # gets the text from the input widget
-    brow.add(name)
-    wid.value('') # clear input text
-    wid.take_focus()
-'''
-
-
 
 
 win=Fl_Window(100,100,400,500,'FL_Browser Example')
@@ -169,24 +145,29 @@ brow=Fl_Hold_Browser(0,55,win.w(),225)
 menu = Fl_Menu_Bar(0,0,win.w(),25)
 # adding buttons to menubar
 menu.add("Open Folder   |",0,navigate_folder)
-menu.add("Skip to...    |/Playing",0,go_to,'playing')
-menu.add("Skip to...    |/First",0,go_to,'first')
-menu.add("Skip to...    |/Last",0,go_to,'last')
-menu.add("Clear All",0,clear_all)
+menu.add("&Skip to...    |/Playing",FL_F+1,go_to,'playing')
+menu.add("&Skip to...    |/First",FL_F+2,go_to,'first')
+menu.add("&Skip to...    |/Last",FL_F+3,go_to,'last')
+menu.add("Clear All",FL_F+4,clear_all)
 # output bar created to displaying playing song
 out=Fl_Output(0,25,win.w(),30) # working
 out.color(FL_YELLOW)
 # buttons created with labels to help user comprehension
 prev_song = Fl_Button(0,280,65,65)
 prev_song.label('@|<')
+prev_song.tooltip('Stop the current song and play the song before it')
 play = Fl_Button(65,280,65,65)
 play.label('@>')
+play.tooltip('Plays Selected song')
 next_song = Fl_Button(130,280,65,65)
 next_song.label('@>|')
+next_song.tooltip('Skip the current song and play the next')
 stop = Fl_Button(195,280,65,65)	
 stop.label('@square')
+stop.tooltip('Stop playing the song that is playing')
 remove = Fl_Button(260,280,65,65)
 remove.label("@menu")
+remove.tooltip('Delete the song selected from your computer')
 # makes window resizeable
 win.resizable(win)
 Fl.scheme('gtk+')
