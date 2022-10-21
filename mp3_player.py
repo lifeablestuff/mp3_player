@@ -14,6 +14,31 @@ index = 0
 global current_song
 current_song = 0
 
+"""
+     @TODO
+    1. Since pos == index and index is 0-based, why not use pos as 0-based as well?
+
+     In general, if there is a mismatch between caller and callee on something, the adjustment should be in the callee end.
+     Do not let caller do any adjustment. If you did, then you are exposing some info about the callee to the caller and
+     usually caller doesn't care.
+
+     The code here is doing double adjustments.
+     - Caller subtract by 1 and
+     - this function then compensate back.
+     It will be much cleaner if let caller decide which format to use and this function do necessary adjustment. By that way,
+     caller does not have knowledge of what index format the callee is using.
+
+    2. It looks like all pos, index, current_song are referring to the same thing, the song is being played.
+       Redundancy is bad!
+       That is because it requires you to maintain all of them and keep them fully aligned all the time.
+       Less is more! More is bad!
+
+       In this function, you decided to let caller pass in the index via pos. That is fine and this function does not need
+       current_song any more. When you need to advance the pos, then later let caller knows the index has changed, then do
+       index = pos + 1
+       to pass this information out.
+
+"""
 def main_playing(pos,action):
 	# deciding what to do
     global pid
@@ -24,7 +49,7 @@ def main_playing(pos,action):
         fl_message('please select a song first')
         return None
     if action == 'skip':
-        if current_song+1 == len(contents):
+        if current_song+1 == len(contents): # @TODO usually people do "if current_song == len(contents) -1:" instead.
             play_a_song(contents[0])
             current_song = 0
             out.value(brow.text(1)) # brow index is 1 based
